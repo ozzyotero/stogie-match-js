@@ -19,26 +19,12 @@ export async function searchByPreferences(req: Request, res: Response) {
   try {
     const criteria = searchCriteriaSchema.parse(req.body);
 
-    const existingSearch = await prisma.search.findFirst({
-      where: {
-        criteria: JSON.stringify(criteria),
-        type: 'preferences',
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    if (existingSearch) {
-      return res.json({ results: JSON.parse(existingSearch.results) });
-    }
-
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a cigar expert. Respond with an array of cigar objects in valid JSON format."
+          content: "You are a cigar expert. Return a JSON object with a 'cigars' array containing cigar recommendations."
         },
         {
           role: "user",
@@ -48,17 +34,19 @@ export async function searchByPreferences(req: Request, res: Response) {
             Origin: ${criteria.origin}
             Occasion: ${criteria.occasion}
             
-            Return ONLY a JSON array of objects with these properties:
-            - id (uuid string)
-            - name (string)
-            - description (string)
-            - flavor (string)
-            - body (string)
-            - origin (string)
-            - occasion (string)
-            - price (string)
-            - maker (string)
-            - makerUrl (string)`
+            Return a JSON object with a 'cigars' array. Each cigar object should have:
+            {
+              "id": "unique-string",
+              "name": "cigar name",
+              "description": "detailed description",
+              "flavor": "flavor profile",
+              "body": "body strength",
+              "origin": "country of origin",
+              "occasion": "best occasion",
+              "price": "price range",
+              "maker": "manufacturer",
+              "makerUrl": "manufacturer website"
+            }`
         }
       ],
       temperature: 0.7,
@@ -66,18 +54,13 @@ export async function searchByPreferences(req: Request, res: Response) {
       response_format: { type: "json_object" }
     });
 
-    let results;
-    try {
-      const content = completion.choices[0].message.content;
-      if (!content) {
-        throw new Error('No content in OpenAI response');
-      }
-      const parsed = JSON.parse(content);
-      results = Array.isArray(parsed.cigars) ? parsed.cigars : parsed;
-    } catch (parseError) {
-      console.error('Parse error:', parseError);
-      throw new Error('Failed to parse OpenAI response');
+    const content = completion.choices[0].message.content;
+    if (!content) {
+      throw new Error('No content in OpenAI response');
     }
+
+    const parsed = JSON.parse(content);
+    const results = parsed.cigars || [];
 
     await prisma.search.create({
       data: {
@@ -98,42 +81,30 @@ export async function searchByName(req: Request, res: Response) {
   try {
     const { name } = nameSearchSchema.parse(req.body);
 
-    const existingSearch = await prisma.search.findFirst({
-      where: {
-        criteria: JSON.stringify({ name }),
-        type: 'name',
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-    });
-
-    if (existingSearch) {
-      return res.json({ results: JSON.parse(existingSearch.results) });
-    }
-
     const completion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo",
       messages: [
         {
           role: "system",
-          content: "You are a cigar expert. Respond with an array of cigar objects in valid JSON format."
+          content: "You are a cigar expert. Return a JSON object with a 'cigars' array containing the searched cigar and similar recommendations."
         },
         {
           role: "user",
-          content: `Provide information about the cigar named "${name}" and suggest 4 similar cigars.
+          content: `Find the cigar named "${name}" and suggest 4 similar cigars.
             
-            Return ONLY a JSON array of objects with these properties:
-            - id (uuid string)
-            - name (string)
-            - description (string)
-            - flavor (string)
-            - body (string)
-            - origin (string)
-            - occasion (string)
-            - price (string)
-            - maker (string)
-            - makerUrl (string)`
+            Return a JSON object with a 'cigars' array. Each cigar object should have:
+            {
+              "id": "unique-string",
+              "name": "cigar name",
+              "description": "detailed description",
+              "flavor": "flavor profile",
+              "body": "body strength",
+              "origin": "country of origin",
+              "occasion": "best occasion",
+              "price": "price range",
+              "maker": "manufacturer",
+              "makerUrl": "manufacturer website"
+            }`
         }
       ],
       temperature: 0.7,
@@ -141,18 +112,13 @@ export async function searchByName(req: Request, res: Response) {
       response_format: { type: "json_object" }
     });
 
-    let results;
-    try {
-      const content = completion.choices[0].message.content;
-      if (!content) {
-        throw new Error('No content in OpenAI response');
-      }
-      const parsed = JSON.parse(content);
-      results = Array.isArray(parsed.cigars) ? parsed.cigars : parsed;
-    } catch (parseError) {
-      console.error('Parse error:', parseError);
-      throw new Error('Failed to parse OpenAI response');
+    const content = completion.choices[0].message.content;
+    if (!content) {
+      throw new Error('No content in OpenAI response');
     }
+
+    const parsed = JSON.parse(content);
+    const results = parsed.cigars || [];
 
     await prisma.search.create({
       data: {

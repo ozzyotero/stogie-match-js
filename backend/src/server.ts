@@ -10,7 +10,11 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors({ origin: config.corsOrigin }));
+app.use(cors({
+  origin: '*', // Allow all origins for now - update this when you have a domain
+  methods: ['GET', 'POST'],
+  credentials: true
+}));
 app.use(morgan('dev'));
 app.use(express.json());
 
@@ -21,6 +25,11 @@ const limiter = rateLimit({
 });
 app.use(limiter);
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 // Routes
 app.use('/api/search', searchRouter);
 
@@ -30,6 +39,12 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   res.status(500).json({ error: 'Something broke!' });
 });
 
-app.listen(config.port, () => {
-  console.log(`Server running on port ${config.port}`);
+// Handle 404
+app.use((req, res) => {
+  res.status(404).json({ error: 'Not Found' });
+});
+
+const port = process.env.PORT || 3000;
+app.listen(port, '0.0.0.0', () => {
+  console.log(`Server running on port ${port}`);
 });
